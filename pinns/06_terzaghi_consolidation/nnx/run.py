@@ -5,6 +5,8 @@ import optax
 from model import PINN
 from helper import pde_residual_batch
 
+import matplotlib.pyplot as plt
+
 model = PINN(rngs=nnx.Rngs(0))
 
 optimizer = nnx.Optimizer(model, optax.adam(1e-3), wrt=nnx.Param)
@@ -26,6 +28,8 @@ z_ic = jax.random.uniform(subkeys[3], (num_ic, 1), minval=0.0, maxval=1.0)
 t_ic = jnp.zeros((num_ic, 1))
 u_ic_target = jnp.ones_like(z_ic)
 
+z_test = jnp.linspace(0, 1, 100).reshape(-1, 1)
+time_steps = [0.01, 0.05, 0.1, 0.2, 0.5, 1.0]
 
 
 def loss_fn(model, z_col, t_col, z_bc, t_bc, z_ic, t_ic, u_ic_target, u_bc_target):
@@ -42,7 +46,7 @@ def loss_fn(model, z_col, t_col, z_bc, t_bc, z_ic, t_ic, u_ic_target, u_bc_targe
 
     ic_loss = jnp.mean((u_ic_pred - u_ic_target)**2)
 
-    return pde_loss + ic_loss + bc_loss
+    return pde_loss + (1 * ic_loss) + (1 * bc_loss)
 
 
 @nnx.jit
@@ -59,3 +63,23 @@ for step in range(2001):
         print(f"Step {step:4d} | Total Loss: {loss:.5f}")
 
 print("SUCCESS: NNX 1D Terzaghi Equation trained successfully.")
+
+plt.figure(figsize=(8, 6))
+
+for t_val in time_steps:
+
+    t_test = jnp.full_like(z_test, t_val)
+    
+    u_pred = model(z_test, t_test)
+    
+    plt.plot(z_test, u_pred, label=f"$T_v$ = {t_val}")
+
+plt.ylim(-0.1, 1.1)
+plt.xlabel("Normalized Depth (z/H)")
+plt.ylabel("Excess Pore Pressure (u)")
+plt.title("Terzaghi Consolidation Isochrones")
+plt.legend()
+plt.grid(True)
+
+plt.savefig("terzaghi_isochrones.png")
+plt.show()
